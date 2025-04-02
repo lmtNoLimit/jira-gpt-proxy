@@ -12,33 +12,38 @@ type ErrorResponse = {
   error: string;
 };
 
+type TokenRequestBody = {
+  code: string;
+  redirect_uri: string;
+  client_id: string;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<TokenResponse | ErrorResponse>
 ) {
-  // Only allow POST or GET requests
-  if (req.method !== 'POST' && req.method !== 'GET') {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Extract code from query parameters
-    const { code } = req.query;
+    const body = req.body as TokenRequestBody;
 
-    // Validate required parameters
-    if (!code) {
-      return res.status(400).json({ error: 'Missing required parameter: code' });
+    // Validate required parameters in request body
+    if (!body.code || !body.redirect_uri || !body.client_id) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters: code, redirect_uri, or client_id in request body' 
+      });
     }
 
-    // Get environment variables
-    const clientId = process.env.ATLASSIAN_CLIENT_ID;
+    // Get client secret from environment variables
     const clientSecret = process.env.ATLASSIAN_CLIENT_SECRET;
-    const redirectUri = process.env.ATLASSIAN_REDIRECT_URI;
 
     // Validate required environment variables
-    if (!clientId || !clientSecret || !redirectUri) {
+    if (!clientSecret) {
       return res.status(500).json({ 
-        error: 'Missing required environment variables: ATLASSIAN_CLIENT_ID, ATLASSIAN_CLIENT_SECRET, or ATLASSIAN_REDIRECT_URI' 
+        error: 'Missing required environment variable: ATLASSIAN_CLIENT_SECRET' 
       });
     }
 
@@ -50,10 +55,10 @@ export default async function handler(
       },
       body: JSON.stringify({
         grant_type: 'authorization_code',
-        client_id: clientId,
+        client_id: body.client_id,
         client_secret: clientSecret,
-        code: code,
-        redirect_uri: redirectUri,
+        code: body.code,
+        redirect_uri: body.redirect_uri,
       }),
     });
 
