@@ -6,12 +6,19 @@ export default function handler(
 ) {
   // Get environment variables
   const clientId = process.env.ATLASSIAN_CLIENT_ID;
-  const redirectUri = process.env.ATLASSIAN_REDIRECT_URI;
 
   // Validate required environment variables
-  if (!clientId || !redirectUri) {
+  if (!clientId) {
     return res.status(500).json({
-      error: 'Missing required environment variables: ATLASSIAN_CLIENT_ID or ATLASSIAN_REDIRECT_URI'
+      error: 'Missing required environment variable: ATLASSIAN_CLIENT_ID'
+    });
+  }
+
+  // Get the redirect_uri from the query parameters (this will be OpenAI's callback URL)
+  const redirectUri = req.query.redirect_uri;
+  if (!redirectUri || typeof redirectUri !== 'string') {
+    return res.status(400).json({
+      error: 'Missing or invalid redirect_uri parameter'
     });
   }
 
