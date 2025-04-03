@@ -5,10 +5,18 @@ type SuccessResponse = {
   token_type: 'Bearer';
   expires_in: number;
   refresh_token: string;
+  cloud_id: string;
 };
 
 type ErrorResponse = {
   error: string;
+};
+
+type AccessibleResource = {
+  id: string;
+  name: string;
+  scopes: string[];
+  avatarUrl: string;
 };
 
 export default async function handler(
@@ -25,11 +33,12 @@ export default async function handler(
   const clientSecret = process.env.ATLASSIAN_CLIENT_SECRET;
 
   if (!code || !redirect_uri || !client_id || !clientSecret) {
-    return res.status(500).json({ error: 'Invalid response from Atlassian' });
+    return res.status(500).json({ error: 'Failed to exchange token' });
   }
 
   try {
-    const response = await fetch('https://auth.atlassian.com/oauth/token', {
+    // Step 1: Exchange code for access token
+    const tokenResponse = await fetch('https://auth.atlassian.com/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -43,19 +52,35 @@ export default async function handler(
       })
     });
 
-    const data = await response.json();
+    const tokenData = await tokenResponse.json();
 
-    if (!response.ok || !data.access_token || !data.expires_in) {
-      return res.status(500).json({ error: 'Invalid response from Atlassian' });
+    if (!tokenResponse.ok || !tokenData.access_token || !tokenData.expires_in) {
+      return res.status(500).json({ error: 'Failed to exchange token' });
     }
 
+    // Step 2: Get cloud ID from accessible resources
+    const resourcesResponse = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const resources = await resourcesResponse.json() as AccessibleResource[];
+
+    if (!resourcesResponse.ok || !resources.length || !resources[0].id) {
+      return res.status(500).json({ error: 'Failed to get cloud ID' });
+    }
+
+    // Return combined response with cloud ID
     return res.status(200).json({
-      access_token: data.access_token,
+      access_token: tokenData.access_token,
       token_type: 'Bearer',
-      expires_in: data.expires_in,
-      refresh_token: data?.refresh_token
+      expires_in: tokenData.expires_in,
+      refresh_token: tokenData.refresh_token || '',
+      cloud_id: resources[0].id
     });
   } catch {
-    return res.status(500).json({ error: 'Invalid response from Atlassian' });
+    return res.status(500).json({ error: 'Failed to complete authentication' });
   }
 } 
