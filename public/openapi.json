@@ -1,0 +1,170 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Jira Proxy API",
+    "version": "1.0.0",
+    "description": "API for proxying requests to Jira"
+  },
+  "servers": [
+    {
+      "url": "https://your-vercel-app.vercel.app",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/api/jira/search": {
+      "post": {
+        "summary": "Search Jira issues using JQL",
+        "operationId": "searchIssues",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["jql"],
+                "properties": {
+                  "jql": {
+                    "type": "string",
+                    "description": "JQL query string to search issues",
+                    "example": "project = PROJ AND status = 'In Progress'"
+                  },
+                  "maxResults": {
+                    "type": "integer",
+                    "description": "Maximum number of issues to return",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 50,
+                    "example": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["issues", "total", "startAt"],
+                  "properties": {
+                    "issues": {
+                      "type": "array",
+                      "description": "List of issues matching the JQL query",
+                      "items": {
+                        "$ref": "#/components/schemas/Issue"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of issues matching the query",
+                      "example": 42
+                    },
+                    "startAt": {
+                      "type": "integer",
+                      "description": "Index of the first issue in the page",
+                      "example": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Issue": {
+        "type": "object",
+        "required": ["id", "key", "fields"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the issue",
+            "example": "10000"
+          },
+          "key": {
+            "type": "string",
+            "description": "Issue key",
+            "example": "PROJ-123"
+          },
+          "fields": {
+            "type": "object",
+            "description": "Issue fields",
+            "properties": {
+              "summary": {
+                "type": "string",
+                "description": "Issue summary",
+                "example": "Implement new feature"
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "In Progress"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message",
+            "example": "Invalid JQL query"
+          },
+          "status": {
+            "type": "integer",
+            "description": "HTTP status code",
+            "example": 400
+          },
+          "detail": {
+            "type": "object",
+            "description": "Additional error details"
+          }
+        }
+      }
+    }
+  }
+} 
