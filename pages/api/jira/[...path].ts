@@ -2,9 +2,15 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 const JIRA_DOMAIN = 'bravebits.jira.com';
 
+type ErrorResponse = {
+  error: string;
+  status?: number;
+  detail?: unknown;
+};
+
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<unknown | ErrorResponse>
 ) {
   // Get credentials from environment variables
   const email = process.env.JIRA_EMAIL;
@@ -39,6 +45,10 @@ export default async function handler(
       }
     });
 
+    // Log the final URL being called
+    console.log(`[Jira API] Calling: ${url.toString()}`);
+    console.log(`[Jira API] Method: ${req.method}`);
+
     // Prepare headers
     const headers: HeadersInit = {
       'Authorization': `Basic ${authToken}`,
@@ -55,6 +65,11 @@ export default async function handler(
       }
     });
 
+    // Log headers (excluding Authorization)
+    const logHeaders = { ...headers };
+    delete logHeaders['Authorization'];
+    console.log('[Jira API] Headers:', logHeaders);
+
     // Prepare request options
     const requestOptions: RequestInit = {
       method: req.method,
@@ -66,18 +81,35 @@ export default async function handler(
       requestOptions.body = typeof req.body === 'string'
         ? req.body
         : JSON.stringify(req.body);
+      console.log('[Jira API] Request Body:', requestOptions.body);
     }
 
     // Forward the request to Jira API
     const jiraResponse = await fetch(url.toString(), requestOptions);
     
-    // Handle unauthorized response
-    if (jiraResponse.status === 401) {
-      return res.status(401).json({ error: 'Unauthorized - Invalid credentials' });
-    }
-
     // Get response data
     const responseData = await jiraResponse.text();
+    
+    // Log the raw response
+    console.log(`[Jira API] Response Status: ${jiraResponse.status}`);
+    console.log('[Jira API] Response Headers:', Object.fromEntries(jiraResponse.headers.entries()));
+    console.log('[Jira API] Response Body:', responseData);
+
+    // Handle non-2xx responses
+    if (!jiraResponse.ok) {
+      let detail;
+      try {
+        detail = JSON.parse(responseData);
+      } catch {
+        detail = responseData;
+      }
+
+      return res.status(jiraResponse.status).json({
+        error: 'Jira API request failed',
+        status: jiraResponse.status,
+        detail
+      });
+    }
 
     // Set response status code
     res.status(jiraResponse.status);
@@ -101,9 +133,11 @@ export default async function handler(
       return res.end();
     }
   } catch (error) {
-    console.error('Jira API proxy error:', error);
+    console.error('[Jira API] Proxy Error:', error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to proxy request to Jira API'
+      error: 'Failed to proxy request to Jira API',
+      status: 500,
+      detail: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 } 
