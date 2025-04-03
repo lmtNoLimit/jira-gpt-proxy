@@ -45,30 +45,23 @@ export default async function handler(
       }
     });
 
-    // Log the final URL being called
-    console.log(`[Jira API] Calling: ${url.toString()}`);
-    console.log(`[Jira API] Method: ${req.method}`);
+    // Log request details
+    console.log(`[Jira API] ${req.method} ${url.toString()}`);
 
     // Prepare headers
     const headers: HeadersInit = {
-      'Authorization': `Basic ${authToken}`,
-      'Content-Type': 'application/json',
+      'Authorization': `Basic ${authToken}`
     };
 
-    // Forward relevant headers from the original request
+    // Forward all headers except host and content-length
     Object.entries(req.headers).forEach(([key, value]) => {
       if (
-        !['host', 'content-length', 'connection', 'authorization'].includes(key.toLowerCase()) &&
+        !['host', 'content-length', 'connection'].includes(key.toLowerCase()) &&
         value !== undefined
       ) {
         headers[key] = value as string;
       }
     });
-
-    // Log headers (excluding Authorization)
-    const logHeaders = { ...headers };
-    delete logHeaders['Authorization'];
-    console.log('[Jira API] Headers:', logHeaders);
 
     // Prepare request options
     const requestOptions: RequestInit = {
@@ -76,40 +69,28 @@ export default async function handler(
       headers,
     };
 
-    // Add body for non-GET requests
+    // Handle request body based on Content-Type
+    const contentType = req.headers['content-type'];
     if (req.method !== 'GET' && req.body) {
-      requestOptions.body = typeof req.body === 'string'
-        ? req.body
-        : JSON.stringify(req.body);
-      console.log('[Jira API] Request Body:', requestOptions.body);
+      if (contentType?.includes('application/json')) {
+        requestOptions.body = typeof req.body === 'string'
+          ? req.body
+          : JSON.stringify(req.body);
+        
+        // Ensure Content-Type is set for JSON requests
+        headers['Content-Type'] = 'application/json';
+      }
+      // Skip body for non-JSON requests to prevent 415 errors
     }
 
     // Forward the request to Jira API
     const jiraResponse = await fetch(url.toString(), requestOptions);
     
+    // Log response status
+    console.log(`[Jira API] Response Status: ${jiraResponse.status}`);
+
     // Get response data
     const responseData = await jiraResponse.text();
-    
-    // Log the raw response
-    console.log(`[Jira API] Response Status: ${jiraResponse.status}`);
-    console.log('[Jira API] Response Headers:', Object.fromEntries(jiraResponse.headers.entries()));
-    console.log('[Jira API] Response Body:', responseData);
-
-    // Handle non-2xx responses
-    if (!jiraResponse.ok) {
-      let detail;
-      try {
-        detail = JSON.parse(responseData);
-      } catch {
-        detail = responseData;
-      }
-
-      return res.status(jiraResponse.status).json({
-        error: 'Jira API request failed',
-        status: jiraResponse.status,
-        detail
-      });
-    }
 
     // Set response status code
     res.status(jiraResponse.status);
