@@ -6,7 +6,7 @@ export default async function handler(
 ) {
   // Extract authorization token
   const authHeader = req.headers.authorization;
-  const cloudId = req.headers['x-cloud-id'];
+  const cloudId = "920347bb-e31b-4d93-aacf-723f318dddb0";
 
   if (!authHeader?.startsWith('Bearer ') || !cloudId) {
     return res.status(401).json({ error: 'Missing authorization token or cloud ID' });
@@ -43,7 +43,7 @@ export default async function handler(
     // Forward relevant headers from the original request
     Object.entries(req.headers).forEach(([key, value]) => {
       if (
-        !['host', 'content-length', 'connection', 'authorization', 'x-cloud-id'].includes(key.toLowerCase()) &&
+        !['host', 'content-length', 'connection', 'authorization'].includes(key.toLowerCase()) &&
         value !== undefined
       ) {
         headers[key] = value as string;
