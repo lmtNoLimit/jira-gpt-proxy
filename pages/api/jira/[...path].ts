@@ -1,27 +1,32 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+const JIRA_DOMAIN = 'bravebits.jira.com';
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Extract authorization token
-  const authHeader = req.headers.authorization;
-  const cloudId = "920347bb-e31b-4d93-aacf-723f318dddb0";
+  // Get credentials from environment variables
+  const email = process.env.JIRA_EMAIL;
+  const apiToken = process.env.JIRA_API_TOKEN;
 
-  if (!authHeader?.startsWith('Bearer ') || !cloudId) {
-    return res.status(401).json({ error: 'Missing authorization token or cloud ID' });
+  if (!email || !apiToken) {
+    return res.status(500).json({ 
+      error: 'Missing JIRA_EMAIL or JIRA_API_TOKEN environment variables' 
+    });
   }
 
-  const accessToken = authHeader.substring(7);
-
   try {
+    // Create base64 encoded Basic Auth token
+    const authToken = Buffer.from(`${email}:${apiToken}`).toString('base64');
+
     // Get the path segments from the dynamic route
     const { path } = req.query;
     const pathSegments = Array.isArray(path) ? path : [path];
     const jiraPath = pathSegments.join('/');
 
     // Build the full Jira API URL
-    const url = new URL(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/${jiraPath}`);
+    const url = new URL(`https://${JIRA_DOMAIN}/rest/api/3/${jiraPath}`);
 
     // Add query parameters (excluding the path parameter)
     Object.entries(req.query).forEach(([key, value]) => {
@@ -36,7 +41,7 @@ export default async function handler(
 
     // Prepare headers
     const headers: HeadersInit = {
-      'Authorization': `Bearer ${accessToken}`,
+      'Authorization': `Basic ${authToken}`,
       'Content-Type': 'application/json',
     };
 
@@ -66,6 +71,11 @@ export default async function handler(
     // Forward the request to Jira API
     const jiraResponse = await fetch(url.toString(), requestOptions);
     
+    // Handle unauthorized response
+    if (jiraResponse.status === 401) {
+      return res.status(401).json({ error: 'Unauthorized - Invalid credentials' });
+    }
+
     // Get response data
     const responseData = await jiraResponse.text();
 
