@@ -45,7 +45,7 @@ export default async function handler(
 
     const data = await response.json();
 
-    if (!response.ok || !data.access_token || !data.refresh_token || !data.expires_in) {
+    if (!response.ok || !data.access_token || !data.expires_in) {
       return res.status(500).json({ error: 'Invalid response from Atlassian' });
     }
 
@@ -53,7 +53,7 @@ export default async function handler(
       access_token: data.access_token,
       token_type: 'Bearer',
       expires_in: data.expires_in,
-      refresh_token: data.refresh_token
+      refresh_token: data?.refresh_token
     });
   } catch {
     return res.status(500).json({ error: 'Invalid response from Atlassian' });
